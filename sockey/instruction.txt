@@ -1,0 +1,9 @@
+docker start Liso
+docker exec -it Liso /bin/bash
+cd project-1
+./liso_server
+./liso_client 127.0.0.1 9999
+HEAD / HTTP/1.1
+
+
+
