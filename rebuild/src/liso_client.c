@@ -24,7 +24,7 @@
 #include <unistd.h>
 
 #define ECHO_PORT 9999
-#define BUF_SIZE 4096
+#define BUF_SIZE 8192
 
 int main(int argc, char* argv[])
 {
@@ -75,8 +75,6 @@ int main(int argc, char* argv[])
 		printf("Failed to open the file\n");
 		return 0;
 	}
-
-    int readRet = read(fd_in,msg,8192);
     int bytes_received;
     fprintf(stdout, "Sending %s", msg);
     send(sock, msg , strlen(msg), 0);

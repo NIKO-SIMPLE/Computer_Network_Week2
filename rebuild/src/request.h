@@ -5,6 +5,7 @@
 #include <netinet/in.h>
 #include <string.h>
 #include <unistd.h>
+#include <errno.h>
 char *get_filetype(char *filename);
 void faliure_send(struct sockaddr_in addr, const int client_sock, const int sock, char *buf, int readret, int clear_buf);
 void build_request(char *buf, char *filename, struct stat fbuf);

@@ -111,6 +111,7 @@ void reponse(struct sockaddr_in addr, int client_sock, int sock, Request *reques
         strcat(filename, "index.html");
     if (stat(filename, &fbuf) == -1) //=0调用成功，否则失败，返回404
     {
+        printf("stat failed with errno: %d\n", errno);
         memset(buf, 0, BUF_SIZE);
         strcpy(buf, "HTTP/1.1 404 Not Found\r\n\r\n");
         readret = strlen(buf);
@@ -144,20 +145,23 @@ void reponse(struct sockaddr_in addr, int client_sock, int sock, Request *reques
         }
         int fsize = fbuf.st_size + strlen(buf); // 文件大小加头的大小
         char buffer[BUF_SIZE];
+        memset(buffer,0,BUF_SIZE);
         if (fbuf.st_size + strlen(buf) <= BUF_SIZE) // 加起来没超buf大小
         {
             fread(buffer, sizeof(char), fbuf.st_size, file);
-            strcat(buf, buffer);
-            readret = strlen(buf);
+            readret = strlen(buf)+fbuf.st_size;
+            memcpy(buf+strlen(buf), buffer,fbuf.st_size);
             faliure_send(addr, client_sock, sock, buf, readret, 0);
             return;
         }
 
         if (fbuf.st_size + strlen(buf) > BUF_SIZE) // 超了，只装一个buf装得下的
         {
-            fread(buffer, sizeof(char), BUF_SIZE - strlen(buf), file);
-            strcat(buf, buffer);
+            int l =fread(buffer, sizeof(char), BUF_SIZE - strlen(buf), file);
+            int a=strlen(buffer);
+            memcpy(buf+strlen(buf), buffer,BUF_SIZE - strlen(buf));
             readret = BUF_SIZE;
+            int b=strlen(buf);
             faliure_send(addr, client_sock, sock, buf, readret, 0);
             fsize = fsize - BUF_SIZE;
         }
@@ -169,7 +173,7 @@ void reponse(struct sockaddr_in addr, int client_sock, int sock, Request *reques
             fsize = fsize - BUF_SIZE;
         }
         fread(buf, sizeof(char), fsize, file);
-        readret = strlen(buf);
+        readret = fsize;
         faliure_send(addr, client_sock, sock, buf, readret, 0);
         return;
     }

@@ -36,7 +36,7 @@ int main(int argc, char *argv[])
     struct sockaddr_in addr, cli_addr;
     char buf[BUF_SIZE];
 
-    fprintf(stdout, "----- Echo Server -----\n");
+    fprintf(stdout, "----- Liso Server -----\n");
 
     /* all networked programs must create a socket */
     if ((sock = socket(PF_INET, SOCK_STREAM, 0)) == -1)
@@ -56,7 +56,7 @@ int main(int argc, char *argv[])
         fprintf(stderr, "Failed binding socket.\n");
         return EXIT_FAILURE;
     }
-
+    setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, NULL, BUF_SIZE);
     if (listen(sock, 5))
     {
         close_socket(sock);
