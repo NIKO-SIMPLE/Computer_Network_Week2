@@ -80,7 +80,7 @@ void build_request(char *buf, char *filename, struct stat fbuf)
     st_atime：最后访问时间。
     st_mtime：最后修改时间。
     st_ctime：最后状态更改时间。*/
-void reponse(struct sockaddr_in addr, int client_sock, int sock, Request *request, char *buf, int readret)
+void response(struct sockaddr_in addr, int client_sock, int sock, Request *request, char *buf, int readret)
 {
     if (request == NULL || readret > 8192)
     {
@@ -102,80 +102,84 @@ void reponse(struct sockaddr_in addr, int client_sock, int sock, Request *reques
         memset(buf, 0, BUF_SIZE);
         return;
     }
-    readret = 0;
-    struct stat fbuf;
-    char filename[8192];
-    memset(filename, 0, 8192);
-    sprintf(filename, "static_site%s", request->http_uri); // 将格式化的字符串保存到filename
-    if (strcmp(filename, "static_site/") == 0)
-        strcat(filename, "index.html");
-    if (stat(filename, &fbuf) == -1) //=0调用成功，否则失败，返回404
-    {
-        printf("stat failed with errno: %d\n", errno);
-        memset(buf, 0, BUF_SIZE);
-        strcpy(buf, "HTTP/1.1 404 Not Found\r\n\r\n");
-        readret = strlen(buf);
-        faliure_send(addr, client_sock, sock, buf, readret, 1);
-        return;
-    }
-    build_request(buf, filename, fbuf);
-    if (!strcmp(request->http_method, "HEAD")) // head直接返回buf
-    {
-        readret = strlen(buf);
-        faliure_send(addr, client_sock, sock, buf, readret, 1);
-        return;
-    }
 
-    if (!strcmp(request->http_method, "GET"))
+    if (!strcmp(request->http_method, "HEAD")||!strcmp(request->http_method, "GET"))
     {
-        if (access(filename, R_OK) == -1) // 文件不可读或者不存在
+        readret = 0;
+        struct stat fbuf;
+        char filename[8192];
+        memset(filename, 0, 8192);
+        sprintf(filename, "static_site%s", request->http_uri); // 将格式化的字符串保存到filename
+        if (strcmp(filename, "static_site/") == 0)
+            strcat(filename, "index.html");
+        if (stat(filename, &fbuf) == -1) //=0调用成功，否则失败，返回404
         {
+            printf("stat failed with errno: %d\n", errno);
             memset(buf, 0, BUF_SIZE);
-            strcpy(buf, "HTTP/1.1 403 Forbidden\r\n\r\n"); // 回显403
+            strcpy(buf, "HTTP/1.1 404 Not Found\r\n\r\n");
             readret = strlen(buf);
             faliure_send(addr, client_sock, sock, buf, readret, 1);
             return;
         }
-        FILE *file = fopen(filename, "rb"); // 打开文件，开始读
-        if (file == NULL)
+        build_request(buf, filename, fbuf);
+        if (!strcmp(request->http_method, "HEAD")) // head直接返回buf
         {
-            fprintf(stderr, "error open file\n");
-            close_socket(sock);
-            return;
-        }
-        int fsize = fbuf.st_size + strlen(buf); // 文件大小加头的大小
-        char buffer[BUF_SIZE];
-        memset(buffer,0,BUF_SIZE);
-        if (fbuf.st_size + strlen(buf) <= BUF_SIZE) // 加起来没超buf大小
-        {
-            fread(buffer, sizeof(char), fbuf.st_size, file);
-            readret = strlen(buf)+fbuf.st_size;
-            memcpy(buf+strlen(buf), buffer,fbuf.st_size);
-            faliure_send(addr, client_sock, sock, buf, readret, 0);
+            readret = strlen(buf);
+            faliure_send(addr, client_sock, sock, buf, readret, 1);
             return;
         }
 
-        if (fbuf.st_size + strlen(buf) > BUF_SIZE) // 超了，只装一个buf装得下的
+        if (!strcmp(request->http_method, "GET"))
         {
-            int l =fread(buffer, sizeof(char), BUF_SIZE - strlen(buf), file);
-            int a=strlen(buffer);
-            memcpy(buf+strlen(buf), buffer,BUF_SIZE - strlen(buf));
-            readret = BUF_SIZE;
-            int b=strlen(buf);
+            if (access(filename, R_OK) == -1) // 文件不可读或者不存在
+            {
+                memset(buf, 0, BUF_SIZE);
+                strcpy(buf, "HTTP/1.1 403 Forbidden\r\n\r\n"); // 回显403
+                readret = strlen(buf);
+                faliure_send(addr, client_sock, sock, buf, readret, 1);
+                return;
+            }
+            FILE *file = fopen(filename, "rb"); // 打开文件，开始读
+            if (file == NULL)
+            {
+                fprintf(stderr, "error open file\n");
+                close_socket(sock);
+                return;
+            }
+            int fsize = fbuf.st_size + strlen(buf); // 文件大小加头的大小
+            char buffer[BUF_SIZE];
+            memset(buffer, 0, BUF_SIZE);
+            if (fbuf.st_size + strlen(buf) <= BUF_SIZE) // 加起来没超buf大小
+            {
+                fread(buffer, sizeof(char), fbuf.st_size, file);
+                readret = strlen(buf) + fbuf.st_size;
+                memcpy(buf + strlen(buf), buffer, fbuf.st_size);
+                faliure_send(addr, client_sock, sock, buf, readret, 0);
+                return;
+            }
+
+            if (fbuf.st_size + strlen(buf) > BUF_SIZE) // 超了，只装一个buf装得下的
+            {
+                int l = fread(buffer, sizeof(char), BUF_SIZE - strlen(buf), file);
+                int a = strlen(buffer);
+                memcpy(buf + strlen(buf), buffer, BUF_SIZE - strlen(buf));
+                readret = BUF_SIZE;
+                int b = strlen(buf);
+                faliure_send(addr, client_sock, sock, buf, readret, 0);
+                fsize = fsize - BUF_SIZE;
+            }
+            while (fsize > BUF_SIZE) // 多发几个buf
+            {
+                fread(buf, sizeof(char), BUF_SIZE, file);
+                readret = BUF_SIZE;
+                faliure_send(addr, client_sock, sock, buf, readret, 0);
+                fsize = fsize - BUF_SIZE;
+            }
+            fread(buf, sizeof(char), fsize, file);
+            readret = fsize;
             faliure_send(addr, client_sock, sock, buf, readret, 0);
-            fsize = fsize - BUF_SIZE;
+            return;
         }
-        while (fsize > BUF_SIZE) // 多发几个buf
-        {
-            fread(buf, sizeof(char), BUF_SIZE, file);
-            readret = BUF_SIZE;
-            faliure_send(addr, client_sock, sock, buf, readret, 0);
-            fsize = fsize - BUF_SIZE;
-        }
-        fread(buf, sizeof(char), fsize, file);
-        readret = fsize;
-        faliure_send(addr, client_sock, sock, buf, readret, 0);
-        return;
     }
     char error501[] = "HTTP/1.1 501 Not Implemented\r\n\r\n";
     send(client_sock, error501, strlen(error501), 0);

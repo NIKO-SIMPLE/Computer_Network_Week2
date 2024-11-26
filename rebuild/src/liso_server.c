@@ -27,6 +27,41 @@
 #define ECHO_PORT 9999
 #define BUF_SIZE 8192
 
+int spilt(char *buf, char **list)
+{
+    int readret = strlen(buf);
+    int count=0;
+    char *p = buf;
+    char *q = buf;
+    int length = 0;
+    if (buf == NULL || readret == 0)
+    {
+        return -1;
+    }
+    while (*p != '\0')
+    {
+        if (*p == '\r')
+        {
+            if (!strncmp(p, "\r\n\r\n", 4))
+            {
+                length = p - q;
+                list[count] = (char *)malloc(length + 5);
+                strncpy(list[count], q, length);
+                (list[count])[length] = '\r';
+                (list[count])[length + 1] = '\n';
+                (list[count])[length + 2] = '\r';
+                (list[count])[length + 3] = '\n';
+                (list[count])[length + 4] = '\0';
+                count++;
+                p = p + 4;
+                q += length + 4;
+                continue;
+            }
+        }
+        p++;
+    }
+    return count;
+}
 
 int main(int argc, char *argv[])
 {
@@ -80,8 +115,19 @@ int main(int argc, char *argv[])
 
         while ((readret = recv(client_sock, buf, BUF_SIZE, 0)) >= 1)
         {
-            Request *request = parse(buf, readret);
-            reponse(addr,client_sock, sock, request, buf,readret);
+            int count = 0;
+            Request *request;
+            char *list[100] = {0};
+            count = spilt(buf, list);
+            int i;
+            for (i = 0; i < count; i++)
+            {
+                memset(buf, 0, BUF_SIZE);
+                strcpy(buf, list[i]);
+                request = parse(buf, BUF_SIZE);
+                response(addr,client_sock,sock,request,buf,strlen(buf));
+                memset(buf, 0, BUF_SIZE);
+            }
         }
 
         if (readret == -1)

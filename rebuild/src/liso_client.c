@@ -75,6 +75,8 @@ int main(int argc, char* argv[])
 		printf("Failed to open the file\n");
 		return 0;
 	}
+
+    int readRet = read(fd_in,msg,8192);
     int bytes_received;
     fprintf(stdout, "Sending %s", msg);
     send(sock, msg , strlen(msg), 0);
