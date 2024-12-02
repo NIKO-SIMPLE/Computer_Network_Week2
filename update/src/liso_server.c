@@ -22,6 +22,9 @@
 #include <time.h>
 #include <errno.h>
 #include <arpa/inet.h>
+#include <sys/select.h>
+#include <sys/time.h>
+#include <fcntl.h>
 
 #include "request.h"
 #include "logger.h"
@@ -94,6 +97,7 @@ int main(int argc, char *argv[])
         write_errorlog(addr, strerror(errno));
         return EXIT_FAILURE;
     }
+    setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, NULL, BUF_SIZE);
 
     if (listen(sock, 5))
     {
@@ -103,10 +107,66 @@ int main(int argc, char *argv[])
         return EXIT_FAILURE;
     }
 
+    fd_set current_socket, ready_socket;
+    FD_ZERO(&current_socket);
+    FD_SET(sock, &current_socket);
+
     /* finally, loop waiting for input and then write it back */
     while (1)
     {
-        cli_size = sizeof(cli_addr);
+        ready_socket = current_socket;
+        int readynum = select(FD_SETSIZE, &ready_socket, NULL, NULL, NULL);
+        if (readynum < 0)
+        {
+            fprintf(stderr, "Error select.\n");
+            return EXIT_FAILURE;
+        }
+
+        for (int i = 0; i < FD_SETSIZE; i++)
+        {
+            if (FD_ISSET(i, &ready_socket))
+            {
+                if (i == sock)
+                {
+                    if ((client_sock = accept(sock, (struct sockaddr *)&cli_addr, &cli_size)) == -1)
+                    {
+                        close(sock);
+                        fprintf(stderr, "Error accepting connection.\n");
+                        return EXIT_FAILURE;
+                    }
+                    FD_SET(client_sock, &current_socket);
+                }
+                else
+                {
+                    int flag = fcntl(i, F_GETFL);
+                    fcntl(i, F_SETFL, flag | O_NONBLOCK);
+                    
+                    readret = 0;
+                    while ((readret = recv(i, buf, BUF_SIZE, 0)) >= 1)
+                    {
+                        int count = 0;
+                        Request *request;
+                        char *list[100] = {0};
+                        count = spilt(buf, list);
+                        int j;
+                        for (j = 0; j < count; j++)
+                        {
+                            memset(buf, 0, BUF_SIZE);
+                            strcpy(buf, list[j]);
+                            request = parse(buf, BUF_SIZE);
+                            response(addr, i, sock, request, buf, strlen(buf));
+                            memset(buf, 0, BUF_SIZE);
+                        }
+                    }
+                    FD_CLR(i,&current_socket);
+                    if (close_socket(i))
+                    {
+                        fprintf(stderr, "Error closing client socket.\n");
+                    }
+                }
+            }
+        }
+        /*cli_size = sizeof(cli_addr);
         if ((client_sock = accept(sock, (struct sockaddr *)&cli_addr,
                                   &cli_size)) == -1)
         {
@@ -116,8 +176,8 @@ int main(int argc, char *argv[])
             return EXIT_FAILURE;
         }
 
-        readret = 0;
 
+        readret = 0;
         while ((readret = recv(client_sock, buf, BUF_SIZE, 0)) >= 1)
         {
             int count = 0;
@@ -125,6 +185,9 @@ int main(int argc, char *argv[])
             char *list[100] = {0};
             count = spilt(buf, list);
             int i;
+            int cnt = count;
+            memcpy(buf, &cnt, sizeof(cnt));
+            send(client_sock, buf, sizeof(buf), 0);   // 回传count
             for (i = 0; i < count; i++)
             {
                 memset(buf, 0, BUF_SIZE);
@@ -134,7 +197,6 @@ int main(int argc, char *argv[])
                 memset(buf, 0, BUF_SIZE);
             }
         }
-
         if (readret == -1)
         {
             close_socket(client_sock);
@@ -150,7 +212,7 @@ int main(int argc, char *argv[])
             fprintf(stderr, "Error closing client socket.\n");
             write_errorlog(addr, strerror(errno));
             return EXIT_FAILURE;
-        }
+        }*/
     }
 
     close_socket(sock);

@@ -24,7 +24,7 @@
 #include <unistd.h>
 
 #define ECHO_PORT 9999
-#define BUF_SIZE 4096
+#define BUF_SIZE 8192
 
 int main(int argc, char* argv[])
 {
@@ -62,7 +62,7 @@ int main(int argc, char* argv[])
     }
         
     char msg[BUF_SIZE]; 
-    memset(msg,0,BUF_SIZE);
+    memset(msg, 0, BUF_SIZE);
     /*fgets(msg, BUF_SIZE, stdin);
     int l = strlen(msg);
     for(int i =1 ; i <= l;i++){
@@ -76,15 +76,24 @@ int main(int argc, char* argv[])
 		return 0;
 	}
 
-    int readRet = read(fd_in,msg,8192);
+    int readRet = read(fd_in, msg, 8192);
     int bytes_received;
     fprintf(stdout, "Sending %s", msg);
     send(sock, msg , strlen(msg), 0);
-    if((bytes_received = recv(sock, buf, BUF_SIZE, 0)) > 1)
+    int cnt_received;
+    recv(sock, buf, BUF_SIZE, 0);
+    memcpy(&cnt_received, buf, sizeof(int));
+    memset(buf, 0, BUF_SIZE);
+    
+    for (int i = 0; i < cnt_received; i++)
     {
-        buf[bytes_received] = '\0';
-        fprintf(stdout, "Received %s", buf);
-    }        
+        if((bytes_received = recv(sock, buf, BUF_SIZE, 0)) > 1)
+        {
+            buf[bytes_received] = '\0';
+            fprintf(stdout, "Received %s", buf);
+            memset(buf, 0, BUF_SIZE);
+        }
+    }
 
     freeaddrinfo(servinfo);
     close(sock);

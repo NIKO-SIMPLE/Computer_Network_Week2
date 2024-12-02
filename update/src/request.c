@@ -81,7 +81,7 @@ void build_request(char *buf, char *filename, struct stat fbuf)
     st_atime：最后访问时间。
     st_mtime：最后修改时间。
     st_ctime：最后状态更改时间。*/
-void reponse(struct sockaddr_in addr, int client_sock, int sock, Request *request, char *buf, int readret)
+void response(struct sockaddr_in addr, int client_sock, int sock, Request *request, char *buf, int readret)
 {
     if (request == NULL || readret > 8192)
     {
