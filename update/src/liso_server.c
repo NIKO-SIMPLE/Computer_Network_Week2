@@ -76,7 +76,7 @@ int main(int argc, char *argv[])
     socklen_t cli_size;
     char buf[BUF_SIZE];
 
-    fprintf(stdout, "----- Echo Server -----\n");
+    fprintf(stdout, "----- Liso Server -----\n");
     init_log();
     /* all networked programs must create a socket */
     if ((sock = socket(PF_INET, SOCK_STREAM, 0)) == -1)
@@ -148,6 +148,9 @@ int main(int argc, char *argv[])
                         Request *request;
                         char *list[100] = {0};
                         count = spilt(buf, list);
+                        int cnt = count;
+                        memcpy(buf, &cnt, sizeof(cnt));
+                        send(i, buf, sizeof(buf), 0);
                         int j;
                         for (j = 0; j < count; j++)
                         {
